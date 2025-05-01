@@ -9,7 +9,10 @@ from livekit.agents.voice import Agent, AgentSession
 from livekit.plugins import openai, deepgram, silero
 from livekit import rtc
 from uuid import uuid4
+from datetime import datetime, timedelta
 import json
+
+TIMEOUT_PERIOD = timedelta(minutes=5)
 
 load_dotenv()
 
@@ -20,7 +23,6 @@ cred = credentials.Certificate("firebase_credentials.json")
 firebase_admin.initialize_app(cred, {
     'databaseURL': 'https://human-in-the-loop-ai-default-rtdb.firebaseio.com'  
 })
-
 help_requests_ref = db.reference('HelpRequests')
 
 class SimpleSalonAgent(Agent):
@@ -40,8 +42,6 @@ class SimpleSalonAgent(Agent):
             tts=openai.TTS(),
             vad=silero.VAD.load()
         )
-
-    
 
     async def on_enter(self):
         question = self.session.input  
@@ -64,22 +64,34 @@ class SimpleSalonAgent(Agent):
 
     async def trigger_request_help(self, question: str):
         help_request_id = str(uuid4())
-        help_requests_ref.child(help_request_id).set({
+        user_identity = self.session.participant.identity
+        help_request_data = {
             'question': question,
-            'status': 'pending'
-        })
+            'status': 'pending',
+            'user_identity': user_identity,
+            'created_at': datetime.utcnow().isoformat(),
+        }
+        
+        help_requests_ref.child(help_request_id).set(help_request_data)
         logger.warning(f"Help request created with ID: {help_request_id}")
 
+        end_time = datetime.utcnow() + TIMEOUT_PERIOD
         while True:
+            current_time = datetime.utcnow()
+            if current_time > end_time:
+                help_requests_ref.child(help_request_id).update({
+                    'status': 'unresolved',
+                    'resolved_at': current_time.isoformat(),
+                })
+                await self.session.say(f"Sorry, the answer to your question is still pending.")
+                logger.warning(f"Help request {help_request_id} timed out and marked as unresolved.")
+                break
+
             request_data = help_requests_ref.child(help_request_id).get()
             if request_data and request_data.get('status') == 'resolved':
                 answer = request_data.get('answer')
-                
                 await self.session.say(f"Here's the answer to your question: {answer}")
-                logger.info(f"Responded to the original caller with: {answer}")
-
-                self.update_knowledge_base(question, answer)
-
+                logger.info(f"Responded to the customer with answer: {answer}")
                 break
             await asyncio.sleep(2)
 
@@ -98,7 +110,6 @@ class SimpleSalonAgent(Agent):
 
         logger.info(f"Knowledge base updated with question: '{question}' and answer: '{answer}'")
 
-
     def view_learned_answers(self):
         knowledge_base_path = Path("knowledge_base.json")
         if knowledge_base_path.exists():
@@ -115,7 +126,6 @@ class SimpleSalonAgent(Agent):
             logger.info("Knowledge base file not found.")
             return "Knowledge base not found."
 
-
 async def entrypoint(ctx: JobContext):
     await ctx.connect()
     session = AgentSession()
@@ -131,9 +141,13 @@ async def entrypoint(ctx: JobContext):
 
     ctx.room.on("participant_connected", lambda p: asyncio.create_task(greet(p)))
 
-
-
-
+def supervisor_responds(help_request_id: str, supervisor_answer: str):
+    help_requests_ref.child(help_request_id).update({
+        'status': 'resolved',
+        'answer': supervisor_answer,
+        'resolved_at': datetime.utcnow().isoformat(),
+    })
+    logger.info(f"Supervisor resolved request {help_request_id} with answer: {supervisor_answer}")
 
 if __name__ == "__main__":
     cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))
