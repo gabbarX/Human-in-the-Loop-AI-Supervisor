@@ -9,6 +9,7 @@ from livekit.agents.voice import Agent, AgentSession
 from livekit.plugins import openai, deepgram, silero
 from livekit import rtc
 from uuid import uuid4
+import json
 
 load_dotenv()
 
@@ -55,13 +56,34 @@ class SimpleSalonAgent(Agent):
             'status': 'pending'
         })
         logger.warning(f"Help request created with ID: {help_request_id}")
+
         while True:
             request_data = help_requests_ref.child(help_request_id).get()
             if request_data and request_data.get('status') == 'resolved':
                 answer = request_data.get('answer')
+                
                 await self.session.say(f"Here's the answer to your question: {answer}")
+                logger.info(f"Responded to the original caller with: {answer}")
+
+                self.update_knowledge_base(question, answer)
+
                 break
             await asyncio.sleep(2)
+
+    def update_knowledge_base(self, question, answer):
+        knowledge_base_path = Path("knowledge_base.json")
+        
+        if knowledge_base_path.exists():
+            with open(knowledge_base_path, 'r') as file:
+                knowledge_base = json.load(file)
+        else:
+            knowledge_base = {}
+        knowledge_base[question] = answer
+
+        with open(knowledge_base_path, 'w') as file:
+            json.dump(knowledge_base, file, indent=4)
+
+        logger.info(f"Knowledge base updated with question: '{question}' and answer: '{answer}'")
 
 
 async def entrypoint(ctx: JobContext):
