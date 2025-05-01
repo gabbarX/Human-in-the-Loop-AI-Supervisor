@@ -55,10 +55,14 @@ class SimpleSalonAgent(Agent):
             'status': 'pending'
         })
         logger.warning(f"Help request created with ID: {help_request_id}")
-        logger.info(f"Simulating texting supervisor: Hey, I need help answering '{question}'.")
+        while True:
+            request_data = help_requests_ref.child(help_request_id).get()
+            if request_data and request_data.get('status') == 'resolved':
+                answer = request_data.get('answer')
+                await self.session.say(f"Here's the answer to your question: {answer}")
+                break
+            await asyncio.sleep(2)
 
-        logger.info("Texting supervisor: Let me check with my supervisor and get back to you.")
-        await self.session.say("I'm not sure how to help with that. Let me get someone to assist you.")
 
 async def entrypoint(ctx: JobContext):
     await ctx.connect()

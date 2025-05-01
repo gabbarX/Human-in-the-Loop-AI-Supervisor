@@ -1,3 +1,4 @@
 /.env
 /firebase_credentials.json
 /humanintheloopai
+__pycache__/firebase.cpython-39.pyc
