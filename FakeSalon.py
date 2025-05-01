@@ -1,21 +1,31 @@
 import logging
 import asyncio
+import firebase_admin
+from firebase_admin import credentials, db
 from pathlib import Path
 from dotenv import load_dotenv
 from livekit.agents import JobContext, WorkerOptions, cli
 from livekit.agents.voice import Agent, AgentSession
 from livekit.plugins import openai, deepgram, silero
 from livekit import rtc
+from uuid import uuid4
 
 load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("salon-agent")
 
+cred = credentials.Certificate("firebase_credentials.json")
+firebase_admin.initialize_app(cred, {
+    'databaseURL': 'https://human-in-the-loop-ai-default-rtdb.firebaseio.com'  
+})
+
+help_requests_ref = db.reference('HelpRequests')
+
 class SimpleSalonAgent(Agent):
     def __init__(self) -> None:
         super().__init__(
-            instructions="""
+            instructions=""" 
                 You are a helpful agent for a fake salon.
                 Here are some basic details about the salon:
                 - The salon offers haircuts, coloring, and styling.
@@ -33,13 +43,21 @@ class SimpleSalonAgent(Agent):
     async def on_enter(self):
         response = await self.session.generate_reply()
         if "request help" in response.lower():
-            await self.trigger_request_help()
+            await self.trigger_request_help(response)
         else:
             await self.session.say(response)
             logger.info(f"Agent responded: {response}")
 
-    async def trigger_request_help(self):
-        logger.warning("Triggering help request: forwarding to human or alerting support.")
+    async def trigger_request_help(self, question: str):
+        help_request_id = str(uuid4())
+        help_requests_ref.child(help_request_id).set({
+            'question': question,
+            'status': 'pending'
+        })
+        logger.warning(f"Help request created with ID: {help_request_id}")
+        logger.info(f"Simulating texting supervisor: Hey, I need help answering '{question}'.")
+
+        logger.info("Texting supervisor: Let me check with my supervisor and get back to you.")
         await self.session.say("I'm not sure how to help with that. Let me get someone to assist you.")
 
 async def entrypoint(ctx: JobContext):
