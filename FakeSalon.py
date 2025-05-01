@@ -64,11 +64,9 @@ class SimpleSalonAgent(Agent):
 
     async def trigger_request_help(self, question: str):
         help_request_id = str(uuid4())
-        user_identity = self.session.participant.identity
         help_request_data = {
             'question': question,
             'status': 'pending',
-            'user_identity': user_identity,
             'created_at': datetime.utcnow().isoformat(),
         }
         
