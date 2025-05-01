@@ -1,13 +1,18 @@
 import logging
+import asyncio
 from pathlib import Path
 from dotenv import load_dotenv
 from livekit.agents import JobContext, WorkerOptions, cli
 from livekit.agents.voice import Agent, AgentSession
 from livekit.plugins import openai, deepgram, silero
+from livekit import rtc
 
 load_dotenv()
 
-class SimpleAgent(Agent):
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("salon-agent")
+
+class SimpleSalonAgent(Agent):
     def __init__(self) -> None:
         super().__init__(
             instructions="""
@@ -26,25 +31,31 @@ class SimpleAgent(Agent):
         )
 
     async def on_enter(self):
-        response = self.session.generate_reply()
+        response = await self.session.generate_reply()
         if "request help" in response.lower():
             await self.trigger_request_help()
         else:
-            logging.info(f"Agent responded: {response}")
-    
+            await self.session.say(response)
+            logger.info(f"Agent responded: {response}")
+
     async def trigger_request_help(self):
-        logging.info("Requesting help from external resources")
+        logger.warning("Triggering help request: forwarding to human or alerting support.")
+        await self.session.say("I'm not sure how to help with that. Let me get someone to assist you.")
 
 async def entrypoint(ctx: JobContext):
     await ctx.connect()
-
     session = AgentSession()
-    agent = SimpleAgent()
+    agent = SimpleSalonAgent()
+    await session.start(agent=agent, room=ctx.room)
 
-    await session.start(
-        agent=agent,
-        room=ctx.room
-    )
+    async def greet(participant: rtc.RemoteParticipant):
+        logger.info(f"Greeting new participant: {participant.identity}")
+        await agent.session.say("Hello! Welcome to our salon. How can I assist you today?")
+
+    for participant in ctx.room.remote_participants.values():
+        asyncio.create_task(greet(participant))
+
+    ctx.room.on("participant_connected", lambda p: asyncio.create_task(greet(p)))
 
 if __name__ == "__main__":
     cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))
