@@ -41,13 +41,26 @@ class SimpleSalonAgent(Agent):
             vad=silero.VAD.load()
         )
 
+    
+
     async def on_enter(self):
-        response = await self.session.generate_reply()
-        if "request help" in response.lower():
-            await self.trigger_request_help(response)
+        question = self.session.input  
+        answer = self.query_knowledge_base(question)
+        
+        if answer:
+            await self.session.say(f"Here's what I found: {answer}")
+            logger.info(f"Responded from knowledge base: {answer}")
         else:
-            await self.session.say(response)
-            logger.info(f"Agent responded: {response}")
+            response = await self.session.generate_reply()
+            if "request help" in response.lower():
+                await self.trigger_request_help(question)
+            else:
+                await self.session.say(response)
+                logger.info(f"Agent responded: {response}")
+        
+        if question.lower() == "show learned answers":
+            learned_answers = self.view_learned_answers()
+            await self.session.say(f"Learned Answers:\n{learned_answers}")
 
     async def trigger_request_help(self, question: str):
         help_request_id = str(uuid4())
@@ -86,6 +99,23 @@ class SimpleSalonAgent(Agent):
         logger.info(f"Knowledge base updated with question: '{question}' and answer: '{answer}'")
 
 
+    def view_learned_answers(self):
+        knowledge_base_path = Path("knowledge_base.json")
+        if knowledge_base_path.exists():
+            with open(knowledge_base_path, 'r') as file:
+                knowledge_base = json.load(file)
+                learned_answers = "\n".join([f"Q: {q} - A: {a}" for q, a in knowledge_base.items()])
+                if learned_answers:
+                    logger.info(f"Learned Answers:\n{learned_answers}")
+                    return learned_answers
+                else:
+                    logger.info("No learned answers yet.")
+                    return "No learned answers yet."
+        else:
+            logger.info("Knowledge base file not found.")
+            return "Knowledge base not found."
+
+
 async def entrypoint(ctx: JobContext):
     await ctx.connect()
     session = AgentSession()
@@ -100,6 +130,10 @@ async def entrypoint(ctx: JobContext):
         asyncio.create_task(greet(participant))
 
     ctx.room.on("participant_connected", lambda p: asyncio.create_task(greet(p)))
+
+
+
+
 
 if __name__ == "__main__":
     cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))
