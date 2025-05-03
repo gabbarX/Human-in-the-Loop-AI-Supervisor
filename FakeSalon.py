@@ -67,7 +67,7 @@ class SimpleSalonAgent(Agent):
         help_request_data = {
             'question': question,
             'status': 'pending',
-            'created_at': datetime.utcnow().isoformat(),
+            'created_at': datetime.now().isoformat(),
         }
         
         help_requests_ref.child(help_request_id).set(help_request_data)
@@ -75,7 +75,7 @@ class SimpleSalonAgent(Agent):
 
         end_time = datetime.utcnow() + TIMEOUT_PERIOD
         while True:
-            current_time = datetime.utcnow()
+            current_time = datetime.now()
             if current_time > end_time:
                 help_requests_ref.child(help_request_id).update({
                     'status': 'unresolved',

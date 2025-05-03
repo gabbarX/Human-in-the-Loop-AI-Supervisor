@@ -1,3 +1,66 @@
+# Salon AI Agent – Setup and Execution Instructions
+
+This guide explains how to set up and run the Salon AI system using two main scripts:
+- app.py (Frontend interface for users and supervisors)
+- FakeSalon.py (Backend AI server that processes questions)
+
+------------------------------------------------------------
+1. Environment Setup
+------------------------------------------------------------
+
+- Make sure you have Python 3.8+ installed.
+- Install dependencies:
+  pip install -r requirements.txt
+
+- Create a .env file in the root directory with required environment variables (e.g., Firebase credentials path, DB URLs).
+- Place firebase_credentials.json in the project root. This file is required for Firebase access.
+
+------------------------------------------------------------
+2. Script Overview
+------------------------------------------------------------
+
+🟦 A. app.py – Frontend App
+----------------------------
+- Handles user interactions and supervisor responses.
+- Displays AI responses or forwards questions to supervisors.
+- Allows supervisors to resolve help requests.
+
+Run with:
+  python app.py
+
+🟨 B. FakeSalon.py – AI Agent Server
+------------------------------------
+- Runs the AI logic and listens for incoming queries.
+- Responds from the knowledge base or creates help requests if it cannot answer.
+
+Run with:
+  python FakeSalon.py
+
+Make sure this script calls:
+  cli.run_app(entrypoint_fnc=...) 
+with the proper entrypoint that initializes SimpleSalonAgent.
+
+------------------------------------------------------------
+3. Running the Full System
+------------------------------------------------------------
+
+Step 1: Start the AI backend
+> python FakeSalon.py console
+
+Step 2: Start the frontend interface
+> python app.py
+
+These two apps work together in real-time using Firebase to handle help requests and supervisor responses.
+
+------------------------------------------------------------
+4. Optional: Automation Script
+------------------------------------------------------------
+
+You can create a shell script or Makefile to launch both components together if needed.
+
+------------------------------------------------------------
+End of Instructions
+------------------------------------------------------------
 
 # Salon AI Agent Design
 
