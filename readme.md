@@ -53,12 +53,6 @@ Step 2: Start the frontend interface
 These two apps work together in real-time using Firebase to handle help requests and supervisor responses.
 
 ------------------------------------------------------------
-4. Optional: Automation Script
-------------------------------------------------------------
-
-You can create a shell script or Makefile to launch both components together if needed.
-
-------------------------------------------------------------
 End of Instructions
 ------------------------------------------------------------
 
